@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <math.h>
+#include <string.h>
 
 #include "FileHandler.h"
 #include "Simulator.h"
@@ -15,9 +16,11 @@ enum outFlag_t {
 void printOutput( int flagOut, result_t result );
 
 int main( int argc, char *argv[] ) {
+	char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
+	
 	if ( argc != 7 ) {
 		printf( "Número de argumentos incorreto. Utilize:\n" );
-		printf( "%s <nsets> <bsize> <assoc> <substituição> <flag_saída> arquivo_de_entrada\n", argv[ 0 ] );
+		printf( "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> arquivo_de_entrada\n", quote, argv[ 0 ], quote );
 		exit( EXIT_FAILURE );
 	}
 
