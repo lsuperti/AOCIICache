@@ -98,7 +98,7 @@ void printOutput( int flagOut, result_t result ) {
  * 
  * It will use the strtol function to parse the input string.
  * 
- * The strtol function is considered safe to parse user-provided strings, as it will do error and security checks. (See the commit that added this function for more information and examples of potential exploits.) (Change "the commit that added this function" to the actual commit number if you see this after it has been commited.)
+ * The strtol function is considered safe to parse user-provided strings, as it will do error and security checks. (See commit #4d1c2bc (the commit that added this function) for more information and examples of potential exploits.)
  * 
  * The strtol function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or "0" respectively (and binary (0b) if the program is compiled with C2x).
  */
