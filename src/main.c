@@ -28,10 +28,10 @@ int main( int argc, char *argv[] ) {
     }
 
     uint32_t  nsets = ( uint32_t )handleNumberInput( argv[ 1 ], 1 );
-    int       bsize = ( uint32_t )handleNumberInput( argv[ 2 ], 2 );
-    int       assoc = ( uint32_t )handleNumberInput( argv[ 3 ], 3 );
+    uint32_t  bsize = ( uint32_t )handleNumberInput( argv[ 2 ], 2 );
+    uint32_t  assoc = ( uint32_t )handleNumberInput( argv[ 3 ], 3 );
     char *    subst = argv[ 4 ];
-    int       flagOut = ( uint32_t )handleNumberInput( argv[ 5 ], 5 );
+    int       flagOut = ( int )handleNumberInput( argv[ 5 ], 5 );
     char *    arquivoEntrada = argv[ 6 ];
 
     printf( "nsets = %d\n", nsets );

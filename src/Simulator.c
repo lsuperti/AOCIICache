@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "Simulator.h"
 
-result_t directMapping( uint32_t * addresses, size_t size, int bsize, int nsets ) {
+result_t directMapping( uint32_t * addresses, size_t size, uint32_t bsize, uint32_t nsets ) {
     int *        value;
 	uint32_t     tag;
 	uint32_t     indice;

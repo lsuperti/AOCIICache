@@ -1,5 +1,8 @@
 #ifndef SIMULADOR_H
 #define SIMULADOR_H
+
+#include <inttypes.h>
+
 typedef struct _result_t {
     int misses;
     int hits;
@@ -9,5 +12,5 @@ typedef struct _result_t {
     int accesses;
 } result_t;
 
-result_t directMapping( uint32_t * addresses, size_t size, int bsize, int nsets );
+result_t directMapping( uint32_t * addresses, size_t size, uint32_t bsize, uint32_t nsets );
 #endif
