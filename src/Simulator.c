@@ -6,14 +6,14 @@
 #include "Simulator.h"
 
 result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsize, uint32_t nsets ) {
-    uint32_t     tag;
-    uint32_t     indice;
-    int          missCompulsorio = 0;
-    int          missConflito = 0;
-    int          hit = 0;
-    int          miss = 0;
-    int nBitsOffset = log2( bsize );
-    int nBitsIndice = log2( nsets );
+    uint32_t  tag;
+    uint32_t  indice;
+    int       missCompulsorio = 0;
+    int       missConflito = 0;
+    int       hit = 0;
+    int       miss = 0;
+    int       nBitsOffset = log2( bsize );
+    int       nBitsIndice = log2( nsets );
 
     // Intellisense (MSVC) doesn't support variable length arrays, so a placeholder is used in the editor.
     #ifndef __INTELLISENSE__
@@ -66,16 +66,25 @@ typedef struct {
 } cacheLine_t;
 
 typedef struct {
-    cacheLine_t * lines; // This will have size equal to the assoc
+    cacheLine_t * lines;
 } cacheSet_t;
 
 typedef struct {
+    // General parameters
     uint32_t      nsets;
     uint32_t      bsize;
     uint32_t      assoc;
     cacheSet_t *  sets;
+    
+    // Runtime parameters
+    bool          cacheKnownFull;
+    
+    // Replacement policy parameters
     unsigned int  lruCounter;
     unsigned int  fifoCounter;
+    
+    // Statistics
+    result_t      result;
 } cache_t;
 
 cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
@@ -84,8 +93,13 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
     cache->bsize = bsize;
     cache->assoc = assoc;
     cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
+    
+    cache->cacheKnownFull = false;
+
     cache->lruCounter = 0;
     cache->fifoCounter = 0;
+
+    cache->result = ( result_t ){ .hits = 0, .capacityMisses = 0, .conflictMisses = 0, .compulsoryMisses = 0, .accesses = 0 };
 
     for ( size_t i = 0; i < nsets; i++ ) {
         cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * assoc );
@@ -128,33 +142,33 @@ bool cacheFull( cache_t * cache ) {
     return true;
 }
 
-void updateCapacityConflictMissStats( cache_t * cache, result_t * result, bool * cacheKnownFull ) {
-    if ( *cacheKnownFull ) {
-        result->capacityMisses++;
+void updateCapacityConflictMissStats( cache_t * cache ) {
+    if ( cache->cacheKnownFull ) {
+        cache->result.capacityMisses++;
     } else {
         if ( cacheFull( cache ) ) {
-            *cacheKnownFull = true;
-            result->capacityMisses++;
+            cache->cacheKnownFull = true;
+            cache->result.capacityMisses++;
         } else {
-            result->conflictMisses++;
+            cache->result.conflictMisses++;
         }
     }
 }
 
-void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
+void accessRandomCache( cache_t * cache, uint32_t address ) {
     uint32_t tag, setIndex, blockOffset;
     parseAddress(cache, address, &tag, &setIndex, &blockOffset);
 
     cacheSet_t * set = &cache->sets[ setIndex ];
     int emptyLineIndex = -1; // Keep track of an empty line, if any
 
-    result->accesses++; // Increment the number of accesses in all cases
+    cache->result.accesses++; // Increment the number of accesses in all cases
 
     // First, try to find a cache hit or an empty line
     for ( uint32_t i = 0; i < cache->assoc; i++ ) {
         if ( set->lines[ i ].valid && set->lines[ i ].tag == tag ) {
             // Cache hit
-            result->hits++;
+            cache->result.hits++;
             
             return;
         }
@@ -170,18 +184,18 @@ void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bo
         set->lines[ emptyLineIndex ].valid = true;
         set->lines[ emptyLineIndex ].tag = tag;
 
-        result->compulsoryMisses++;
+        cache->result.compulsoryMisses++;
     } else {
         // If no empty line, select a random line to replace
         uint32_t replaceIndex = rand() % cache->assoc;
         set->lines[ replaceIndex ].tag = tag;
         set->lines[ replaceIndex ].valid = true;
         
-        updateCapacityConflictMissStats( cache, result, cacheKnownFull );
+        updateCapacityConflictMissStats( cache );
     }
 }
 
-void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
+void accessLRUCache( cache_t * cache, uint32_t address ) {
     uint32_t  tag;
     uint32_t  setIndex;
     uint32_t  blockOffset;
@@ -194,7 +208,7 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
     unsigned int oldestTime = UINT_MAX;
     int32_t lruIndex = -1; // Index of the LRU line
 
-    result->accesses++; // Increment the number of accesses in all cases
+    cache->result.accesses++; // Increment the number of accesses in all cases
 
     // Update LRU counter and find a cache hit, an empty line, or the LRU line
     for ( uint32_t i = 0; i < cache->assoc; i++ ) {
@@ -202,7 +216,7 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
             if ( set->lines[i].tag == tag ) {
                 // Cache hit
                 set->lines[i].lastUsed = ++cache->lruCounter; // Update usage time
-                result->hits++;
+                cache->result.hits++;
                 
                 return;
             }
@@ -223,17 +237,17 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
         set->lines[ emptyLineIndex ].tag = tag;
         set->lines[ emptyLineIndex ].lastUsed = ++cache->lruCounter; // Update usage time
 
-        result->compulsoryMisses++;
+        cache->result.compulsoryMisses++;
     } else {
         // Replace the LRU line
         set->lines[ lruIndex ].tag = tag;
         set->lines[ lruIndex ].lastUsed = ++cache->lruCounter; // Update usage time
 
-        updateCapacityConflictMissStats( cache, result, cacheKnownFull );
+        updateCapacityConflictMissStats( cache );
     }
 }
 
-void accessCacheFIFO( cache_t * cache, unsigned address, result_t * result, bool * cacheKnownFull ) {
+void accessCacheFIFO( cache_t * cache, unsigned address ) {
     uint32_t  tag;
     uint32_t  setIndex;
     uint32_t  blockOffset;
@@ -245,14 +259,14 @@ void accessCacheFIFO( cache_t * cache, unsigned address, result_t * result, bool
     unsigned int oldestInsertion = UINT_MAX;
     int fifoIndex = -1; // Index for FIFO replacement
 
-    result->accesses++; // Increment the number of accesses in all cases
+    cache->result.accesses++; // Increment the number of accesses in all cases
 
     // Search for a cache hit, an empty line, or the oldest line for FIFO
     for ( uint32_t i = 0; i < cache->assoc; i++ ) {
         if ( set->lines[ i ].valid ) {
             if ( set->lines[ i ].tag == tag ) {
                 // Cache hit, FIFO doesn't update on access, only on insertion
-                result->hits++;
+                cache->result.hits++;
 
                 return;
             }
@@ -273,37 +287,42 @@ void accessCacheFIFO( cache_t * cache, unsigned address, result_t * result, bool
         set->lines[ emptyLineIndex ].tag = tag;
         set->lines[ emptyLineIndex ].inserted = ++cache->fifoCounter; // Set insertion time
 
-        result->compulsoryMisses++;
+        cache->result.compulsoryMisses++;
     } else {
         // No empty line, replace the oldest line based on FIFO policy
         set->lines[ fifoIndex ].tag = tag;
         set->lines[ fifoIndex ].inserted = ++cache->fifoCounter; // Update insertion time for replaced line
 
-        updateCapacityConflictMissStats( cache, result, cacheKnownFull );
+        updateCapacityConflictMissStats( cache );
     }
 }
 
 result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
     cache_t *  cache = initializeCache( nsets, bsize, assoc );
-    result_t   result = { .accesses = 0, .capacityMisses = 0, .compulsoryMisses = 0, .hits = 0, .conflictMisses = 0 };
-    bool       cacheKnownFull = false;
+    result_t   result;
 
     if ( replacementPolicy == RANDOM ) {
         for ( size_t i = 0; i < size; i++ ) {
-            accessRandomCache( cache, addresses[ i ], &result, &cacheKnownFull );
+            accessRandomCache( cache, addresses[ i ] );
         }
+
+        result = cache->result;
         
         destroyCache( cache );
     } else if ( replacementPolicy == LRU ) {
         for ( size_t i = 0; i < size; i++ ) {
-            accessLRUCache( cache, addresses[ i ], &result, &cacheKnownFull );
+            accessLRUCache( cache, addresses[ i ] );
         }
+        
+        result = cache->result;
         
         destroyCache( cache );
     } else if ( replacementPolicy == FIFO ) {
         for ( size_t i = 0; i < size; i++ ) {
-            accessCacheFIFO( cache, addresses[ i ], &result, &cacheKnownFull );
+            accessCacheFIFO( cache, addresses[ i ] );
         }
+        
+        result = cache->result;
         
         destroyCache( cache );
     } else {
