@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <time.h>
 
 #include "FileHandler.h"
 #include "Simulator.h"
@@ -17,8 +18,10 @@ enum outFlag_t {
 
 void printOutput( int flagOut, result_t result );
 long handleNumberInput( char * input, int index );
+int parseReplacementPolicy( char * subst );
 
 int main( int argc, char *argv[] ) {
+    srand( time( NULL ) );
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
     if ( argc != 7 ) {
@@ -49,7 +52,10 @@ int main( int argc, char *argv[] ) {
     result_t  result;
     
     if ( assoc == 1 ) {
-        result = directMapping( addresses, size, bsize, nsets );
+        result = simulateDirectMapping( addresses, size, bsize, nsets );
+    } else {       
+        int replacementPolicy = parseReplacementPolicy( subst );
+        result = simulate( addresses, size, nsets, bsize, assoc, replacementPolicy );
     }
 
     printOutput( flagOut, result );
@@ -98,9 +104,9 @@ void printOutput( int flagOut, result_t result ) {
  * 
  * It will use the strtol function to parse the input string.
  * 
- * The strtol function is considered safe to parse user-provided strings, as it will do error and security checks. (See commit #4d1c2bc (the commit that added this function) for more information and examples of potential exploits.)
+ * The strtol function is considered safe to parse user-provided strings, as it will do error and security checks.
  * 
- * The strtol function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or "0" respectively (and binary (0b) if the program is compiled with C2x).
+ * The strtol function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or "0" respectively (and binary ("0b") if the program is compiled with C2x).
  */
 long handleNumberInput( char * input, int index ) {
     long number;
@@ -121,4 +127,26 @@ long handleNumberInput( char * input, int index ) {
     }
     
     return number;
+}
+
+/*
+ * This function parses the replacement policy string and return the corresponding enum value.
+ * 
+ * It accepts either uppercase or lowercase letters as it seems the specification requires that.
+ * 
+ * The accepted letters are: 'R' for RANDOM, 'L' for LRU, and 'F' for FIFO.
+ */
+int parseReplacementPolicy( char * subst ) {
+    #define ASCII_CHAR_TO_UPPER( c ) ( ( c ) & 0xDF )
+    
+    if ( ASCII_CHAR_TO_UPPER( subst[ 0 ] ) == 'R' && subst[ 1 ] == '\0' ) {
+        return RANDOM;
+    } else if ( ASCII_CHAR_TO_UPPER( subst[ 0 ] ) == 'L' && subst[ 1 ] == '\0' ) {
+        return LRU;
+    } else if ( ASCII_CHAR_TO_UPPER( subst[ 0 ] ) == 'F' && subst[ 1 ] == '\0' ) {
+        return FIFO;
+    } else {
+        printf( "Erro: política de substituição \"%s\" não é suportada.\n", subst );
+        exit( EXIT_FAILURE );
+    }
 }

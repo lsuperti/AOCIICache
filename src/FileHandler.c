@@ -24,6 +24,7 @@ void handleBinaryFile( char * filename, uint32_t ** addresses, size_t * size ) {
     
     if ( file == NULL ) {
         perror( filename );
+        exit( EXIT_FAILURE );
         return;
     }
     
