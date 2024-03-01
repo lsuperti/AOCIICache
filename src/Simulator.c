@@ -59,9 +59,10 @@ result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsiz
 }
 
 typedef struct {
-    bool valid;
-    uint32_t tag;
-    unsigned int lastUsed;
+    bool          valid;
+    uint32_t      tag;
+    unsigned int  lastUsed; // For LRU
+    unsigned int  inserted; // For FIFO
 } cacheLine_t;
 
 typedef struct {
@@ -69,11 +70,12 @@ typedef struct {
 } cacheSet_t;
 
 typedef struct {
-    uint32_t nsets;
-    uint32_t bsize;
-    uint32_t assoc;
-    cacheSet_t * sets;
-    unsigned int lruCounter;
+    uint32_t      nsets;
+    uint32_t      bsize;
+    uint32_t      assoc;
+    cacheSet_t *  sets;
+    unsigned int  lruCounter;
+    unsigned int  fifoCounter;
 } cache_t;
 
 cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
@@ -83,6 +85,7 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
     cache->assoc = assoc;
     cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
     cache->lruCounter = 0;
+    cache->fifoCounter = 0;
 
     for ( size_t i = 0; i < nsets; i++ ) {
         cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * assoc );
@@ -194,7 +197,7 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
     result->accesses++; // Increment the number of accesses in all cases
 
     // Update LRU counter and find a cache hit, an empty line, or the LRU line
-    for ( size_t i = 0; i < cache->assoc; i++ ) {
+    for ( uint32_t i = 0; i < cache->assoc; i++ ) {
         if ( set->lines[i].valid ) {
             if ( set->lines[i].tag == tag ) {
                 // Cache hit
@@ -230,6 +233,55 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
     }
 }
 
+void accessCacheFIFO( cache_t * cache, unsigned address, result_t * result, bool * cacheKnownFull ) {
+    uint32_t  tag;
+    uint32_t  setIndex;
+    uint32_t  blockOffset;
+    
+    parseAddress( cache, address, &tag, &setIndex, &blockOffset );
+
+    cacheSet_t * set = &cache->sets[ setIndex ];
+    int emptyLineIndex = -1;
+    unsigned int oldestInsertion = UINT_MAX;
+    int fifoIndex = -1; // Index for FIFO replacement
+
+    result->accesses++; // Increment the number of accesses in all cases
+
+    // Search for a cache hit, an empty line, or the oldest line for FIFO
+    for ( uint32_t i = 0; i < cache->assoc; i++ ) {
+        if ( set->lines[ i ].valid ) {
+            if ( set->lines[ i ].tag == tag ) {
+                // Cache hit, FIFO doesn't update on access, only on insertion
+                result->hits++;
+
+                return;
+            }
+            
+            if ( set->lines[ i ].inserted < oldestInsertion ) {
+                oldestInsertion = set->lines[ i ].inserted;
+                fifoIndex = i; // Remember the oldest line for possible replacement
+            }
+        } else if ( emptyLineIndex == -1 ) {
+            emptyLineIndex = i; // Remember the first empty line found
+        }
+    }
+
+    // Cache miss handling
+    if ( emptyLineIndex != -1 ) {
+        // Use the empty line for new data
+        set->lines[ emptyLineIndex ].valid = 1;
+        set->lines[ emptyLineIndex ].tag = tag;
+        set->lines[ emptyLineIndex ].inserted = ++cache->fifoCounter; // Set insertion time
+
+        result->compulsoryMisses++;
+    } else {
+        // No empty line, replace the oldest line based on FIFO policy
+        set->lines[ fifoIndex ].tag = tag;
+        set->lines[ fifoIndex ].inserted = ++cache->fifoCounter; // Update insertion time for replaced line
+
+        updateCapacityConflictMissStats( cache, result, cacheKnownFull );
+    }
+}
 
 result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
     cache_t *  cache = initializeCache( nsets, bsize, assoc );
