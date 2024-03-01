@@ -2,7 +2,163 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug",
+            "name": "Test 1",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["256", "4", "1", "R", "1", "tests/bin_100.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 2",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["128", "2", "4", "R", "1", "tests/bin_1000.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 3",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["16", "2", "8", "R", "1", "tests/bin_10000.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 4",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["512", "8", "2", "R", "1", "tests/vortex.in.sem.persons.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 5",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["1", "4", "32", "R", "1", "tests/vortex.in.sem.persons.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 6",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["2", "1", "8", "R", "1", "tests/bin_100.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 7",
             "type": "cppdbg",
             "request": "launch",
             "args": ["2", "1", "8", "L", "1", "tests/bin_100.bin"],
@@ -26,6 +182,110 @@
                 "program": "${workspaceFolder}/output/cache_simulator.exe"
             },
             "preLaunchTask": "build"
-        }
+        },
+        {
+            "name": "Test 8",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["2", "1", "8", "F", "1", "tests/bin_100.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 9",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["1", "4", "32", "R", "1", "tests/vortex.in.sem.persons.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 10",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["1", "4", "32", "L", "1", "tests/vortex.in.sem.persons.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Test 11",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["1", "4", "32", "F", "1", "tests/vortex.in.sem.persons.bin"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        },
     ]
 }
