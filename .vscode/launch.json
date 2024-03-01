@@ -5,7 +5,7 @@
             "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
-            "args": ["16", "2", "8", "R", "1", "tests/bin_10000.bin"],
+            "args": ["2", "1", "8", "L", "1", "tests/bin_100.bin"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

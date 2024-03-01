@@ -130,7 +130,7 @@ long handleNumberInput( char * input, int index ) {
 }
 
 /*
- * This function parses the replacement policy string and return the corresponding enum value.
+ * This function parses the replacement policy string and returns the corresponding enum value.
  * 
  * It accepts either uppercase or lowercase letters as it seems the specification requires that.
  * 

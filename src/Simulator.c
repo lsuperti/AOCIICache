@@ -63,7 +63,7 @@ result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsiz
 typedef struct {
     bool valid;
     uint32_t tag;
-    // Add a field for LRU, timestamp, or other metadata for replacement policy
+    unsigned int lastUsed;
 } cacheLine_t;
 
 typedef struct {
@@ -71,11 +71,11 @@ typedef struct {
 } cacheSet_t;
 
 typedef struct {
-    unsigned nsets;
-    unsigned bsize;
-    unsigned assoc;
+    uint32_t nsets;
+    uint32_t bsize;
+    uint32_t assoc;
     cacheSet_t * sets;
-    // Add fields for statistics (hits, misses, etc.)
+    unsigned int lruCounter;
 } cache_t;
 
 cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
@@ -84,12 +84,13 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
     cache->bsize = bsize;
     cache->assoc = assoc;
     cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
+	cache->lruCounter = 0;
 
     for ( size_t i = 0; i < nsets; i++ ) {
         cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * assoc );
         for ( size_t j = 0; j < assoc; j++ ) {
             cache->sets[ i ].lines[ j ].valid = false;
-            // Initialize other fields (e.g., tag, LRU metadata)
+            cache->sets[ i ].lines[ j ].lastUsed = 0;
         }
     }
     
@@ -124,6 +125,21 @@ bool cacheFull( cache_t * cache ) {
 	}
 	
 	return true;
+}
+
+void updateCapacityConflictMissStats( cache_t * cache, result_t * result, bool * cacheKnownFull ) {
+	if ( *cacheKnownFull ) {
+		result->capacityMisses++;
+	} else {
+		if ( cacheFull( cache ) ) {
+			*cacheKnownFull = true;
+			result->capacityMisses++;
+		} else {
+			result->conflictMisses++;
+		}
+	}
+
+	result->misses++;
 }
 
 void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
@@ -162,22 +178,64 @@ void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bo
         uint32_t replaceIndex = rand() % cache->assoc;
         set->lines[ replaceIndex ].tag = tag;
         set->lines[ replaceIndex ].valid = true;
-
-		result->misses++;
 		
-		if ( *cacheKnownFull ) {
-			result->capacityMisses++;
-		} else {
-			if ( cacheFull( cache ) ) {
-				*cacheKnownFull = true;
-				result->capacityMisses++;
-			} else {
-				result->conflictMisses++;
-			}
-		}
-		
+		updateCapacityConflictMissStats( cache, result, cacheKnownFull );
     }
 }
+
+void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
+    uint32_t  tag;
+	uint32_t  setIndex;
+	uint32_t  blockOffset;
+    
+	parseAddress( cache, address, &tag, &setIndex, &blockOffset );
+
+    cacheSet_t * set = &cache->sets[ setIndex ];
+    
+	int emptyLineIndex = -1;
+    unsigned int oldestTime = UINT_MAX;
+    int32_t lruIndex = -1; // Index of the LRU line
+
+	result->accesses++; // Increment the number of accesses in all cases
+
+    // Update LRU counter and find a cache hit, an empty line, or the LRU line
+    for ( size_t i = 0; i < cache->assoc; i++ ) {
+        if ( set->lines[i].valid ) {
+            if ( set->lines[i].tag == tag ) {
+                // Cache hit
+                set->lines[i].lastUsed = ++cache->lruCounter; // Update usage time
+				result->hits++;
+                
+				return;
+            }
+            
+			if ( set->lines[ i ].lastUsed < oldestTime ) {
+                oldestTime = set->lines[ i ].lastUsed;
+                lruIndex = i; // Remember the LRU line
+            }
+        } else if ( emptyLineIndex == -1 ) {
+            emptyLineIndex = i; // Remember the first empty line
+        }
+    }
+
+    // Cache miss handling
+    if ( emptyLineIndex != -1 ) {
+        // Use the empty line
+        set->lines[ emptyLineIndex ].valid = 1;
+        set->lines[ emptyLineIndex ].tag = tag;
+        set->lines[ emptyLineIndex ].lastUsed = ++cache->lruCounter; // Update usage time
+
+		result->misses++;
+		result->compulsoryMisses++;
+    } else {
+        // Replace the LRU line
+        set->lines[ lruIndex ].tag = tag;
+        set->lines[ lruIndex ].lastUsed = ++cache->lruCounter; // Update usage time
+
+		updateCapacityConflictMissStats( cache, result, cacheKnownFull );
+    }
+}
+
 
 result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
 	cache_t *  cache = initializeCache( nsets, bsize, assoc );
@@ -190,13 +248,17 @@ result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t b
 		}
 		
 		destroyCache( cache );
+	} else if ( replacementPolicy == LRU ) {
+		for ( size_t i = 0; i < size; i++ ) {
+			accessLRUCache( cache, addresses[ i ], &result, &cacheKnownFull );
+		}
 		
-		return result;
+		destroyCache( cache );
 	} else {
 		printf( "Politica de substituição inválida ou não implementada." );
 		destroyCache( cache );
 		exit( EXIT_FAILURE );
-		
-		return result;
 	}
+
+	return result;
 }
