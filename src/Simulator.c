@@ -55,7 +55,7 @@ result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsiz
     
 	}
 
-	result_t result = { .misses = miss, .hits = hit, .compulsoryMisses = missCompulsorio, .capacityMisses = 0, .conflictMisses = missConflito, .accesses = size };
+	result_t result = { .hits = hit, .compulsoryMisses = missCompulsorio, .capacityMisses = 0, .conflictMisses = missConflito, .accesses = size };
 	
 	return result;
 }
@@ -138,8 +138,6 @@ void updateCapacityConflictMissStats( cache_t * cache, result_t * result, bool *
 			result->conflictMisses++;
 		}
 	}
-
-	result->misses++;
 }
 
 void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
@@ -171,7 +169,6 @@ void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bo
         set->lines[ emptyLineIndex ].valid = true;
         set->lines[ emptyLineIndex ].tag = tag;
 
-		result->misses++;
 		result->compulsoryMisses++;
     } else {
         // If no empty line, select a random line to replace
@@ -225,7 +222,6 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
         set->lines[ emptyLineIndex ].tag = tag;
         set->lines[ emptyLineIndex ].lastUsed = ++cache->lruCounter; // Update usage time
 
-		result->misses++;
 		result->compulsoryMisses++;
     } else {
         // Replace the LRU line
@@ -239,7 +235,7 @@ void accessLRUCache( cache_t * cache, uint32_t address, result_t * result, bool 
 
 result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
 	cache_t *  cache = initializeCache( nsets, bsize, assoc );
-	result_t   result = { .accesses = 0, .capacityMisses = 0, .compulsoryMisses = 0, .hits = 0, .misses = 0, .conflictMisses = 0 };
+	result_t   result = { .accesses = 0, .capacityMisses = 0, .compulsoryMisses = 0, .hits = 0, .conflictMisses = 0 };
 	bool       cacheKnownFull = false;
 
 	if ( replacementPolicy == RANDOM ) {

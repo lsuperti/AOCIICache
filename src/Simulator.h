@@ -4,7 +4,6 @@
 #include <inttypes.h>
 
 typedef struct _result_t {
-    int misses;
     int hits;
     int capacityMisses;
     int conflictMisses;

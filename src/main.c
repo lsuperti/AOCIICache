@@ -67,10 +67,11 @@ int main( int argc, char *argv[] ) {
 
 void printOutput( int flagOut, result_t result ) {
     const float hitRate = ( ( float ) result.hits / result.accesses );
-    const float missRate = ( ( float ) result.misses / result.accesses );
-    const float compulsoryMissRate = ( ( float ) result.compulsoryMisses / result.misses );
-    const float capacityMissRate = ( ( float ) result.capacityMisses / result.misses );
-    const float conflictMissRate = ( ( float ) result.conflictMisses / result.misses );
+    const int   totalMisses = result.capacityMisses + result.conflictMisses + result.compulsoryMisses;
+    const float missRate = ( ( float ) totalMisses / result.accesses );
+    const float compulsoryMissRate = ( ( float ) result.compulsoryMisses / totalMisses );
+    const float capacityMissRate = ( ( float ) result.capacityMisses / totalMisses );
+    const float conflictMissRate = ( ( float ) result.conflictMisses / totalMisses );
     
     if ( flagOut == FREEFORM_OUT ) {
         printf( "Hits: %d\n"
@@ -85,7 +86,7 @@ void printOutput( int flagOut, result_t result ) {
                 "Capacity miss rate: %f\n"
                 "Conflict miss rate: %f\n",
                 result.hits,
-                result.misses,
+                totalMisses,
                 result.compulsoryMisses,
                 result.capacityMisses,
                 result.conflictMisses,
