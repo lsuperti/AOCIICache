@@ -28,7 +28,7 @@ result_t directMapping( uint32_t * addresses, size_t size, uint32_t bsize, uint3
         //printf( "0x%08" PRIX32 "\n", addresses[ i ] );
 
 		tag = addresses[ i ] >> ( nBitsIndice + nBitsOffset );
-		indice = ( addresses[ i ] >> nBitsOffset ) && ( pow( 2, nBitsIndice) - 1 );
+		indice = ( addresses[ i ] >> nBitsOffset ) & ( ( 1 << nBitsIndice ) - 1 );
 
 		// para o mapeamento direto
 		if ( cacheVal[ indice ] == 0 ) {
