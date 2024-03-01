@@ -126,7 +126,7 @@ bool cacheFull( cache_t * cache ) {
 	return true;
 }
 
-void accessRandomCache( cache_t * cache, uint32_t address, result_t * result ) {
+void accessRandomCache( cache_t * cache, uint32_t address, result_t * result, bool * cacheKnownFull ) {
     uint32_t tag, setIndex, blockOffset;
     parseAddress(cache, address, &tag, &setIndex, &blockOffset);
 
@@ -164,21 +164,29 @@ void accessRandomCache( cache_t * cache, uint32_t address, result_t * result ) {
         set->lines[ replaceIndex ].valid = true;
 
 		result->misses++;
-		if ( cacheFull( cache ) ) {
+		
+		if ( *cacheKnownFull ) {
 			result->capacityMisses++;
 		} else {
-			result->conflictMisses++;
+			if ( cacheFull( cache ) ) {
+				*cacheKnownFull = true;
+				result->capacityMisses++;
+			} else {
+				result->conflictMisses++;
+			}
 		}
+		
     }
 }
 
 result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
-	cache_t * cache = initializeCache( nsets, bsize, assoc );
-	result_t result = { .accesses = 0, .capacityMisses = 0, .compulsoryMisses = 0, .hits = 0, .misses = 0, .conflictMisses = 0 };
+	cache_t *  cache = initializeCache( nsets, bsize, assoc );
+	result_t   result = { .accesses = 0, .capacityMisses = 0, .compulsoryMisses = 0, .hits = 0, .misses = 0, .conflictMisses = 0 };
+	bool       cacheKnownFull = false;
 
 	if ( replacementPolicy == RANDOM ) {
 		for ( size_t i = 0; i < size; i++ ) {
-			accessRandomCache( cache, addresses[ i ], &result );
+			accessRandomCache( cache, addresses[ i ], &result, &cacheKnownFull );
 		}
 		
 		destroyCache( cache );
