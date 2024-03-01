@@ -96,7 +96,7 @@ void printOutput( int flagOut, result_t result ) {
                 capacityMissRate,
                 conflictMissRate );
     } else {
-        printf( "%d, %f, %f, %f, %f, %f\n", result.accesses, hitRate, missRate, compulsoryMissRate, capacityMissRate, conflictMissRate );
+        printf( "%d, %.4f, %.4f, %.2f, %.2f, %.2f\n", result.accesses, hitRate, missRate, compulsoryMissRate, capacityMissRate, conflictMissRate );
     }
 }
 
