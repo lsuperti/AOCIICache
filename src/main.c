@@ -25,8 +25,8 @@ int main( int argc, char *argv[] ) {
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
     if ( argc != 7 ) {
-        printf( "Número de argumentos incorreto. Utilize:\n" );
-        printf( "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
+        fprintf( stderr, "Número de argumentos incorreto. Utilize:\n" );
+        fprintf( stderr, "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
         exit( EXIT_FAILURE );
     }
 
@@ -123,7 +123,7 @@ long parseNumberInput( char * input, int index ) {
     number = strtoul( input, &endptr, 0 );
     
     if ( *endptr != '\0' || endptr == input || errno == ERANGE ) {
-        printf( "Erro: argumento \"%s\" no parâmetro %s não é um número válido ou aceitável.\n", input, args[ index ] );
+        fprintf( stderr, "Erro: argumento \"%s\" no parâmetro %s não é um número válido ou aceitável.\n", input, args[ index ] );
         exit( EXIT_FAILURE );
     }
     
@@ -147,7 +147,7 @@ int parseReplacementPolicy( char * subst ) {
     } else if ( ASCII_CHAR_TO_UPPER( subst[ 0 ] ) == 'F' && subst[ 1 ] == '\0' ) {
         return FIFO;
     } else {
-        printf( "Erro: política de substituição \"%s\" não é suportada.\n", subst );
+        fprintf( stderr, "Erro: política de substituição \"%s\" não é suportada.\n", subst );
         exit( EXIT_FAILURE );
     }
 }

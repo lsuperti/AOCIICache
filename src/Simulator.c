@@ -26,8 +26,6 @@ result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsiz
     
     for ( size_t i = 0; i < size; i++ ) {
 
-        //printf( "0x%08" PRIX32 "\n", addresses[ i ] );
-
         tag = addresses[ i ] >> ( nBitsIndice + nBitsOffset );
         indice = ( addresses[ i ] >> nBitsOffset ) & ( ( 1 << nBitsIndice ) - 1 );
 
@@ -250,8 +248,14 @@ result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t b
         }
         
         destroyCache( cache );
+    } else if ( replacementPolicy == FIFO ) {
+        for ( size_t i = 0; i < size; i++ ) {
+            accessCacheFIFO( cache, addresses[ i ], &result, &cacheKnownFull );
+        }
+        
+        destroyCache( cache );
     } else {
-        printf( "Politica de substituição inválida ou não implementada." );
+        fprintf( stderr, "Politica de substituição inválida ou não implementada." );
         destroyCache( cache );
         exit( EXIT_FAILURE );
     }
