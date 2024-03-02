@@ -8,7 +8,7 @@
 #include "Simulator.h"
 
 /*
- * Calculates the base 2 logarithm of a number that is a power of 2.
+ * Calculate the base 2 logarithm of a number that is a power of 2.
  *
  * Since all properties of a cache are powers of 2, this function can be used instead of the math library's log2 function, which can cause issues with some compilers.
  */
@@ -133,12 +133,12 @@ typedef struct _cacheSet_t {
     cacheLine_t * lines;
 } cacheSet_t;
 
-typedef struct _cache_t {
+typedef struct _cache_t {   
     // General parameters
     uint32_t      nsets;
     uint32_t      bsize;
     uint32_t      assoc;
-    cacheSet_t *  sets;
+    int           replacementPolicy;
     
     // Runtime parameters
     bool          cacheKnownFull;
@@ -149,17 +149,20 @@ typedef struct _cache_t {
     
     // Statistics
     result_t      result;
+
+    // Cache structure
+    cacheSet_t *  sets;
 } cache_t;
 
 /*
- * This function initializes a cache structure with the given parameters.
+ * This function initializes a cache structure.
  */
-cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
+cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
     cache_t * cache = malloc( sizeof( cache_t ) );
     cache->nsets = nsets;
     cache->bsize = bsize;
     cache->assoc = assoc;
-    cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
+    cache->replacementPolicy = replacementPolicy;
     
     cache->cacheKnownFull = false;
 
@@ -167,6 +170,8 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
     cache->fifoCounter = 0;
 
     cache->result = ( result_t ){ .hits = 0, .capacityMisses = 0, .conflictMisses = 0, .compulsoryMisses = 0, .accesses = 0 };
+
+    cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
 
     for ( size_t i = 0; i < nsets; i++ ) {
         cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * assoc );
@@ -181,7 +186,7 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc ) {
 }
 
 /*
- * This function parses a cache address into its tag, set index, and block offset.
+ * Parse a cache address into its tag, set index, and block offset.
  */
 void parseAddress( cache_t * cache, uint32_t address, uint32_t * tag, uint32_t * setIndex, uint32_t * blockOffset ) {
     uint32_t offsetBits = log2PowerOf2( cache->bsize );
@@ -205,7 +210,7 @@ void destroyCache( cache_t * cache ) {
 }
 
 /*
- * This function checks if the cache is full by checking if all the lines are valid.
+ * Check if the cache is full by checking if all the lines are valid.
  *
  * This function has a time complexity of O(n * m), where n is the number of sets and m is the associativity, so unecessary calls should be avoided.
  */
@@ -222,9 +227,9 @@ bool cacheFull( cache_t * cache ) {
 }
 
 /*
- * This function determines if a cache miss is a capacity miss or a conflict miss and updates the statistics accordingly.
+ * Determine if a cache miss is a capacity miss or a conflict miss and update the statistics accordingly.
  *
- * It uses the slow cacheFull function, but it also keeps track of the known full status of the cache so it won't call it when the cache is already known to be full.
+ * This function uses the slow cacheFull function, but it also keeps track of the known full status of the cache so it won't call it when the cache is already known to be full.
  */
 void updateCapacityConflictMissStats( cache_t * cache ) {
     if ( cache->cacheKnownFull ) {
@@ -240,7 +245,7 @@ void updateCapacityConflictMissStats( cache_t * cache ) {
 }
 
 /*
- * This function simulates a cache access using the random replacement policy.
+ * Simulate a cache access using the RANDOM replacement policy.
  */
 void accessCacheRandom( cache_t * cache, uint32_t address ) {
     uint32_t tag, setIndex, blockOffset;
@@ -283,7 +288,7 @@ void accessCacheRandom( cache_t * cache, uint32_t address ) {
 }
 
 /*
- * This function simulates a cache access using the LRU replacement policy.
+ * Simulate a cache access using the LRU replacement policy.
  */
 void accessCacheLRU( cache_t * cache, uint32_t address ) {
     uint32_t  tag;
@@ -338,7 +343,7 @@ void accessCacheLRU( cache_t * cache, uint32_t address ) {
 }
 
 /*
- * This function simulates a cache access using the FIFO replacement policy.
+ * Simulate a cache access using the FIFO replacement policy.
  */
 void accessCacheFIFO( cache_t * cache, unsigned address ) {
     uint32_t  tag;
@@ -391,31 +396,36 @@ void accessCacheFIFO( cache_t * cache, unsigned address ) {
 }
 
 /*
+ * Simulate a cache access using the cache's replacement policy.
+ *
+ * This a dispatch function that calls the appropriate function for the cache's replacement policy.
+ */
+void accessCache( cache_t * cache, uint32_t address ) {
+    if ( cache->replacementPolicy == RANDOM ) {
+        accessCacheRandom( cache, address );
+    } else if ( cache->replacementPolicy == LRU ) {
+        accessCacheLRU( cache, address );
+    } else if ( cache->replacementPolicy == FIFO ) {
+        accessCacheFIFO( cache, address );
+    } else {
+        fputs( "Politica de substituição inválida.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+}
+
+/*
  * Simulates the behaviour of a cache accessing an array of addresses.
  *
- * It accepts any valid number of sets, block size, and associativity for 32-bit cache.
+ * Accepts any valid number of sets, block size, and associativity for 32-bit cache.
  * 
  * The supported replacement policies are RANDOM, LRU, and FIFO.
  */
 result_t simulate( uint32_t * addresses, size_t addressesSize, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
-    cache_t *  cache = initializeCache( nsets, bsize, assoc );
+    cache_t *  cache = initializeCache( nsets, bsize, assoc, replacementPolicy );
     result_t   result;
 
-    if ( replacementPolicy == RANDOM ) {
-        for ( size_t i = 0; i < addressesSize; i++ ) {
-            accessCacheRandom( cache, addresses[ i ] );
-        }
-    } else if ( replacementPolicy == LRU ) {
-        for ( size_t i = 0; i < addressesSize; i++ ) {
-            accessCacheLRU( cache, addresses[ i ] );
-        }
-    } else if ( replacementPolicy == FIFO ) {
-        for ( size_t i = 0; i < addressesSize; i++ ) {
-            accessCacheFIFO( cache, addresses[ i ] );
-        }
-    } else {
-        fputs( "Politica de substituição inválida.\n", stderr );
-        exit( EXIT_FAILURE );
+    for ( size_t i = 0; i < addressesSize; i++ ) {
+        accessCache( cache, addresses[ i ] );
     }
 
     result = cache->result;
