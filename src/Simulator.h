@@ -1,5 +1,5 @@
-#ifndef SIMULADOR_H
-#define SIMULADOR_H
+#ifndef SIMULATOR_H
+#define SIMULATOR_H
 
 #include <inttypes.h>
 
@@ -17,6 +17,6 @@ enum replacementPolicy_t {
     FIFO
 };
 
-result_t simulateDirectMapping( uint32_t * addresses, size_t size, uint32_t bsize, uint32_t nsets );
-result_t simulate( uint32_t * addresses, size_t size, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy );
+result_t simulateDirectMapping( uint32_t * addresses, size_t addressesSize, uint32_t bsize, uint32_t nsets );
+result_t simulate( uint32_t * addresses, size_t addressesSize, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy );
 #endif

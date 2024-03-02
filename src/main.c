@@ -16,62 +16,62 @@ enum outFlag_t {
     STANDARDIZED_OUT = 1
 };
 
-void printOutput( int flagOut, result_t result );
-long parseNumberInput( char * input, int index );
-int parseReplacementPolicy( char * subst );
+void  printOutput( result_t result, int flagOut );
+long  parseNumberInput( char * input, int index );
+int   parseReplacementPolicy( char * subst );
 
 int main( int argc, char *argv[] ) {
     srand( time( NULL ) );
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
     if ( argc != 7 ) {
-        fprintf( stderr, "Número de argumentos incorreto. Utilize:\n" );
-        fprintf( stderr, "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
+        fprintf( stderr, "Número de argumentos incorreto. Utilize:\n"
+                         "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
         exit( EXIT_FAILURE );
     }
 
-    uint32_t  nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
-    uint32_t  bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
-    uint32_t  assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
-    char *    subst = argv[ 4 ];
-    int       flagOut = ( int )parseNumberInput( argv[ 5 ], 5 );
-    char *    arquivoEntrada = argv[ 6 ];
-
-    printf( "nsets = %d\n", nsets );
-    printf( "bsize = %d\n", bsize );
-    printf( "assoc = %d\n", assoc );
-    printf( "subst = %s\n", subst );
-    printf( "flagOut = %d\n", flagOut );
-    printf( "arquivo = %s\n", arquivoEntrada );
-
-    uint32_t * addresses;
-    size_t size;
+    uint32_t    nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
+    uint32_t    bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
+    uint32_t    assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
+    char *      substString = argv[ 4 ];
+    int         flagOut = ( int )parseNumberInput( argv[ 5 ], 5 );
+    char *      arquivoEntrada = argv[ 6 ];
+    uint32_t *  addresses;
+    size_t      size;
+    result_t    result;
     
     handleFile( arquivoEntrada, &addresses, &size );
 
-    result_t  result;
-    
     if ( assoc == 1 ) {
         result = simulateDirectMapping( addresses, size, bsize, nsets );
     } else {       
-        int replacementPolicy = parseReplacementPolicy( subst );
+        int replacementPolicy = parseReplacementPolicy( substString );
         result = simulate( addresses, size, nsets, bsize, assoc, replacementPolicy );
     }
 
-    printOutput( flagOut, result );
+    printOutput( result, flagOut );
 
     free( addresses );
 
     return 0;
 }
 
-void printOutput( int flagOut, result_t result ) {
-    const float hitRate = ( ( float ) result.hits / result.accesses );
-    const int   totalMisses = result.capacityMisses + result.conflictMisses + result.compulsoryMisses;
-    const float missRate = ( ( float ) totalMisses / result.accesses );
-    const float compulsoryMissRate = ( ( float ) result.compulsoryMisses / totalMisses );
-    const float capacityMissRate = ( ( float ) result.capacityMisses / totalMisses );
-    const float conflictMissRate = ( ( float ) result.conflictMisses / totalMisses );
+/*
+ * This function prints the output of the simulation.
+ *
+ * It will print the output in a freeform or standardized format, depending on the flagOut parameter.
+ * 
+ * The freeform format is a human-readable format that prints the results in a more verbose way.
+ * 
+ * The standardized format is a machine-readable format that prints the results in a more concise way defined by the specification.
+ */
+void printOutput( result_t result, int flagOut ) {
+    const float  hitRate = ( ( float ) result.hits / result.accesses );
+    const int    totalMisses = result.capacityMisses + result.conflictMisses + result.compulsoryMisses;
+    const float  missRate = ( ( float ) totalMisses / result.accesses );
+    const float  compulsoryMissRate = ( ( float ) result.compulsoryMisses / totalMisses );
+    const float  capacityMissRate = ( ( float ) result.capacityMisses / totalMisses );
+    const float  conflictMissRate = ( ( float ) result.conflictMisses / totalMisses );
     
     if ( flagOut == FREEFORM_OUT ) {
         printf( "Hits: %d\n"
