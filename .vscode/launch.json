@@ -287,5 +287,31 @@
             },
             "preLaunchTask": "build"
         },
+        {
+            "name": "Multi level test",
+            "type": "cppdbg",
+            "request": "launch",
+            "args": ["1", "4", "32", "R", "1", "tests/vortex.in.sem.persons.bin", "-l3", "4", "16", "128", "L", "-l2", "2", "8", "64", "F"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "miDebuggerPath": "lldb-mi",
+                "program": "${workspaceFolder}/output/cache_simulator"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "gdb.exe",
+                "program": "${workspaceFolder}/output/cache_simulator.exe"
+            },
+            "preLaunchTask": "build"
+        }
     ]
 }

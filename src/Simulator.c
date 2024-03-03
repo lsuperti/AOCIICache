@@ -6,6 +6,7 @@
 #include <limits.h>
 
 #include "Simulator.h"
+#include "CacheConfig.h"
 
 /*
  * Calculate the base 2 logarithm of a number that is a power of 2.
@@ -420,8 +421,8 @@ void accessCache( cache_t * cache, uint32_t address ) {
  * 
  * The supported replacement policies are RANDOM, LRU, and FIFO.
  */
-result_t simulate( uint32_t * addresses, size_t addressesSize, uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
-    cache_t *  cache = initializeCache( nsets, bsize, assoc, replacementPolicy );
+result_t simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList_t * cacheConfigList ) {
+    cache_t *  cache = initializeCache( cacheConfigList->cacheConfig.nsets, cacheConfigList->cacheConfig.bsize, cacheConfigList->cacheConfig.assoc, cacheConfigList->cacheConfig.replacementPolicy );
     result_t   result;
 
     for ( size_t i = 0; i < addressesSize; i++ ) {

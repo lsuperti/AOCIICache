@@ -10,48 +10,81 @@
 
 #include "FileHandler.h"
 #include "Simulator.h"
+#include "CacheConfig.h"
 
 enum outFlag_t {
     FREEFORM_OUT = 0,
     STANDARDIZED_OUT = 1
 };
 
-void  printOutput( result_t result, int flagOut );
-long  parseNumberInput( char * input, int index );
-int   parseReplacementPolicy( char * subst );
+void           printOutput( result_t result, int flagOut );
+unsigned long  parseNumberInput( char * input, int index );
+int            parseReplacementPolicy( char * subst );
+unsigned long  parseCacheLevelSpecifier( char * input );
 
 int main( int argc, char *argv[] ) {
     srand( time( NULL ) );
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
-    if ( argc != 7 ) {
+    if ( argc < 7 ) {
         fprintf( stderr, "Número de argumentos incorreto. Utilize:\n"
-                         "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
+                         "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada> [-l<level> <nsets> <bsize> <assoc> <substituição>]*\n", quote, argv[ 0 ], quote );
         exit( EXIT_FAILURE );
     }
 
-    uint32_t    nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
-    uint32_t    bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
-    uint32_t    assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
-    char *      substString = argv[ 4 ];
-    int         flagOut = ( int )parseNumberInput( argv[ 5 ], 5 );
-    char *      arquivoEntrada = argv[ 6 ];
-    uint32_t *  addresses;
-    size_t      size;
-    result_t    result;
+    // Get the parameters and first cache level
+    uint32_t             nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
+    uint32_t             bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
+    uint32_t             assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
+    char *               substString = argv[ 4 ];
+    int                  flagOut = ( int )parseNumberInput( argv[ 5 ], 5 );
+    char *               arquivoEntrada = argv[ 6 ];
+    uint32_t *           addresses;
+    size_t               size;
+    result_t             result;
+    unsigned long        cacheLevel;
+    cacheConfig_t        cacheConfig = { .nsets = nsets, .bsize = bsize, .assoc = assoc, .replacementPolicy = parseReplacementPolicy( substString ), .level = 1 };
+    cacheConfigList_t *  cacheConfigList;
+    
+    initializeCacheConfigList( &cacheConfigList, &cacheConfig );
+
+    // Get lower cache levels
+    for ( int i = 7; i < argc; i += 5 ) {
+        if ( argv[ i ][ 0 ] == '-' && argv[ i ][ 1 ] == 'l' ) {
+            cacheLevel = parseCacheLevelSpecifier( argv[ i ] );
+
+            if ( argc < i + 5 ) {
+                argv[ i ][ 1 ] -= 32; // Make the L uppercase to print the level better
+                fprintf( stderr, "Número de argumentos incorreto na cache %s. Utilize:\n"
+                                 "[-l<level> <nsets> <bsize> <assoc> <substituição>]\n", argv[ i ] + 1 );
+                exit( EXIT_FAILURE );
+            }
+
+            nsets = ( uint32_t )parseNumberInput( argv[ i + 1 ], 1 );
+            bsize = ( uint32_t )parseNumberInput( argv[ i + 2 ], 2 );
+            assoc = ( uint32_t )parseNumberInput( argv[ i + 3 ], 3 );
+            substString = argv[ i + 4 ];
+
+            cacheConfig = ( cacheConfig_t ){ .nsets = nsets, .bsize = bsize, .assoc = assoc, .replacementPolicy = parseReplacementPolicy( substString ), .level = cacheLevel };
+
+            pushCacheConfig( &cacheConfigList, &cacheConfig );
+        }
+    }
+
+    verifyCacheConfig( cacheConfigList );
     
     handleFile( arquivoEntrada, &addresses, &size );
 
-    if ( assoc == 1 ) {
-        result = simulateDirectMapping( addresses, size, bsize, nsets );
-    } else {       
-        int replacementPolicy = parseReplacementPolicy( substString );
-        result = simulate( addresses, size, nsets, bsize, assoc, replacementPolicy );
+    if ( assoc == 1 && cacheConfigList->next == NULL ) {
+        result = simulateDirectMapping( addresses, size, cacheConfigList->cacheConfig.bsize, cacheConfigList->cacheConfig.nsets );
+    } else {
+        result = simulate( addresses, size, cacheConfigList );
     }
 
     printOutput( result, flagOut );
 
     free( addresses );
+    destroyCacheConfigList( cacheConfigList );
 
     return 0;
 }
@@ -109,12 +142,12 @@ void printOutput( result_t result, int flagOut ) {
  * 
  * The strtoul function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or "0" respectively (and binary ("0b") if the program is compiled with C2x).
  */
-long parseNumberInput( char * input, int index ) {
-    unsigned long number;
-    char *        endptr;
-    const char *  args[] = { NULL, "<nsets>", "<bsize>", "<assoc>", "<substituição>", "<flag_saída>", "<arquivo_de_entrada>" };
+unsigned long parseNumberInput( char * input, int index ) {
+    unsigned long  number;
+    char *         endptr;
+    const char *   args[] = { NULL, "<nsets>", "<bsize>", "<assoc>", "<substituição>", "<flag_saída>", "<arquivo_de_entrada>" };
 
-    static_assert( sizeof( unsigned long ) >= sizeof( uint32_t ), "A unsigned long isn't a least 32 bits that allow any acceptable parameter values parameters to be taken. Consider using unsigned long long instead." );
+    static_assert( sizeof( unsigned long ) >= sizeof( uint32_t ), "An unsigned long isn't a least 32 bits that allow any acceptable parameter values parameters to be taken. Consider using unsigned long long instead." );
     static_assert( ERANGE != 0, "ERANGE (range-related errors) is 0, that means it will always report an error when parsing the number input, since it checks if errno is ERANGE and errno is set to 0 before the string handling that could cause the error to ensure a previous error is not caught inadvertently. A solution is to set the errno to some other value, but that may cause problems elsewhere." );
 
     errno = 0;
@@ -124,6 +157,27 @@ long parseNumberInput( char * input, int index ) {
     
     if ( *endptr != '\0' || endptr == input || errno == ERANGE ) {
         fprintf( stderr, "Erro: argumento \"%s\" no parâmetro %s não é um número válido ou aceitável.\n", input, args[ index ] );
+        exit( EXIT_FAILURE );
+    }
+    
+    return number;
+}
+
+/*
+ * Parses a cache level specifier argument string and returns the corresponding cache level number.
+ */
+unsigned long parseCacheLevelSpecifier( char * input ) {
+    unsigned long  number;
+    char *         endptr;
+
+    static_assert( ERANGE != 0, "ERANGE (range-related errors) is 0, that means it will always report an error when parsing the number input, since it checks if errno is ERANGE and errno is set to 0 before the string handling that could cause the error to ensure a previous error is not caught inadvertently. A solution is to set the errno to some other value, but that may cause problems elsewhere." );
+
+    errno = 0;
+
+    number = strtoul( input + 2, &endptr, 10 );
+    
+    if ( *endptr != '\0' || endptr == input || errno == ERANGE ) {
+        fprintf( stderr, "Erro: especificador de nível de cache =\"%s\" é inválido.\n", input );
         exit( EXIT_FAILURE );
     }
     
