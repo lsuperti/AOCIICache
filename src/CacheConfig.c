@@ -7,6 +7,12 @@
 
 void initializeCacheConfigList( cacheConfigList_t ** head, cacheConfig_t * cacheConfig ) {
     *head = malloc( sizeof( cacheConfigList_t ) );
+    
+    if ( *head == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+
     ( *head )->cacheConfig = *cacheConfig;
     ( *head )->next = NULL;
 }
@@ -18,6 +24,11 @@ void initializeCacheConfigList( cacheConfigList_t ** head, cacheConfig_t * cache
  */
 void pushCacheConfig( cacheConfigList_t ** head, cacheConfig_t * cacheConfig ) {
     cacheConfigList_t * newCacheConfig = malloc( sizeof( cacheConfigList_t ) );
+
+    if ( newCacheConfig == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
     
     newCacheConfig->cacheConfig = *cacheConfig;
     newCacheConfig->next = NULL;

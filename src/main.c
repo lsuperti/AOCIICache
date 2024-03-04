@@ -17,13 +17,16 @@ enum outFlag_t {
     STANDARDIZED_OUT = 1
 };
 
-void           printOutput( result_t result, int flagOut );
+void           printOutput( result_t * results, unsigned long cacheLevels, int flagOut );
 unsigned long  parseNumberInput( char * input, int index );
 int            parseReplacementPolicy( char * subst );
 unsigned long  parseCacheLevelSpecifier( char * input );
 
 int main( int argc, char *argv[] ) {
+    // Seed the random number generator
     srand( time( NULL ) );
+    
+    // Quote the executable path if it has spaces
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
     if ( argc < 7 ) {
@@ -32,7 +35,7 @@ int main( int argc, char *argv[] ) {
         exit( EXIT_FAILURE );
     }
 
-    // Get the parameters and first cache level
+    // Get the parameters and first cache level configuration
     uint32_t             nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
     uint32_t             bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
     uint32_t             assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
@@ -41,10 +44,11 @@ int main( int argc, char *argv[] ) {
     char *               arquivoEntrada = argv[ 6 ];
     uint32_t *           addresses;
     size_t               size;
-    result_t             result;
+    result_t *           results;
     unsigned long        cacheLevel;
     cacheConfig_t        cacheConfig = { .nsets = nsets, .bsize = bsize, .assoc = assoc, .replacementPolicy = parseReplacementPolicy( substString ), .level = 1 };
     cacheConfigList_t *  cacheConfigList;
+    unsigned long        numberOfCacheLevels = 1;
     
     initializeCacheConfigList( &cacheConfigList, &cacheConfig );
 
@@ -54,7 +58,7 @@ int main( int argc, char *argv[] ) {
             cacheLevel = parseCacheLevelSpecifier( argv[ i ] );
 
             if ( argc < i + 5 ) {
-                argv[ i ][ 1 ] -= 32; // Make the L uppercase to print the level better
+                argv[ i ][ 1 ] -= 32; // Make the L uppercase to print the level correctly
                 fprintf( stderr, "Número de argumentos incorreto na cache %s. Utilize:\n"
                                  "[-l<level> <nsets> <bsize> <assoc> <substituição>]\n", argv[ i ] + 1 );
                 exit( EXIT_FAILURE );
@@ -68,6 +72,8 @@ int main( int argc, char *argv[] ) {
             cacheConfig = ( cacheConfig_t ){ .nsets = nsets, .bsize = bsize, .assoc = assoc, .replacementPolicy = parseReplacementPolicy( substString ), .level = cacheLevel };
 
             pushCacheConfig( &cacheConfigList, &cacheConfig );
+
+            numberOfCacheLevels++;
         }
     }
 
@@ -76,15 +82,23 @@ int main( int argc, char *argv[] ) {
     handleFile( arquivoEntrada, &addresses, &size );
 
     if ( assoc == 1 && cacheConfigList->next == NULL ) {
-        result = simulateDirectMapping( addresses, size, cacheConfigList->cacheConfig.bsize, cacheConfigList->cacheConfig.nsets );
+        results = malloc( sizeof( result_t ) );
+
+        if ( results == NULL ) {
+            fputs( "Sem memória.\n", stderr );
+            exit( EXIT_FAILURE );
+        }   
+
+        results[ 0 ] = simulateDirectMapping( addresses, size, cacheConfigList->cacheConfig.bsize, cacheConfigList->cacheConfig.nsets );
     } else {
-        result = simulate( addresses, size, cacheConfigList );
+        results = simulate( addresses, size, cacheConfigList );
     }
 
-    printOutput( result, flagOut );
+    printOutput( results, numberOfCacheLevels, flagOut );
 
     free( addresses );
     destroyCacheConfigList( cacheConfigList );
+    free( results );
 
     return 0;
 }
@@ -98,39 +112,50 @@ int main( int argc, char *argv[] ) {
  * 
  * The standardized format is a machine-readable format that prints the results in a more concise way defined by the specification.
  */
-void printOutput( result_t result, int flagOut ) {
-    const float  hitRate = ( ( float ) result.hits / result.accesses );
-    const int    totalMisses = result.capacityMisses + result.conflictMisses + result.compulsoryMisses;
-    const float  missRate = ( ( float ) totalMisses / result.accesses );
-    const float  compulsoryMissRate = ( ( float ) result.compulsoryMisses / totalMisses );
-    const float  capacityMissRate = ( ( float ) result.capacityMisses / totalMisses );
-    const float  conflictMissRate = ( ( float ) result.conflictMisses / totalMisses );
+void printOutput( result_t * results, unsigned long cacheLevels, int flagOut ) {
+    float  hitRate;
+    int    totalMisses;
+    float  missRate;
+    float  compulsoryMissRate;
+    float  capacityMissRate;
+    float  conflictMissRate;
     
-    if ( flagOut == FREEFORM_OUT ) {
-        printf( "Hits: %d\n"
-                "Misses: %d\n"
-                "Compulsory Misses: %d\n"
-                "Capacity Misses: %d\n"
-                "Conflict Misses: %d\n"
-                "Accesses: %d\n"
-                "Hit rate: %f\n"
-                "Miss rate: %f\n"
-                "Compulsory miss rate: %f\n"
-                "Capacity miss rate: %f\n"
-                "Conflict miss rate: %f\n",
-                result.hits,
-                totalMisses,
-                result.compulsoryMisses,
-                result.capacityMisses,
-                result.conflictMisses,
-                result.accesses,
-                hitRate,
-                missRate,
-                compulsoryMissRate,
-                capacityMissRate,
-                conflictMissRate );
-    } else {
-        printf( "%d, %.4f, %.4f, %.2f, %.2f, %.2f\n", result.accesses, hitRate, missRate, compulsoryMissRate, capacityMissRate, conflictMissRate );
+    for ( unsigned long i = 0; i < cacheLevels; i++ ) {
+        hitRate = ( ( float )results[ i ].hits / results[ i ].accesses );
+        totalMisses = results[ i ].capacityMisses + results[ i ].conflictMisses + results[ i ].compulsoryMisses;
+        missRate = ( ( float ) totalMisses / results[ i ].accesses );
+        compulsoryMissRate = ( ( float )results[ i ].compulsoryMisses / totalMisses );
+        capacityMissRate = ( ( float )results[ i ].capacityMisses / totalMisses );
+        conflictMissRate = ( ( float )results[ i ].conflictMisses / totalMisses );
+        
+        if ( flagOut == FREEFORM_OUT ) {
+                printf( "========== L%lu ==========\n"
+                        "Hits: %d\n"
+                        "Misses: %d\n"
+                        "Accesses: %d\n"
+                        "Compulsory Misses: %d\n"
+                        "Capacity Misses: %d\n"
+                        "Conflict Misses: %d\n"
+                        "Hit rate: %f\n"
+                        "Miss rate: %f\n"
+                        "Compulsory miss rate: %f\n"
+                        "Capacity miss rate: %f\n"
+                        "Conflict miss rate: %f\n",
+                        i + 1,
+                        results[ i ].hits,
+                        totalMisses,
+                        results[ i ].accesses,
+                        results[ i ].compulsoryMisses,
+                        results[ i ].capacityMisses,
+                        results[ i ].conflictMisses,
+                        hitRate,
+                        missRate,
+                        compulsoryMissRate,
+                        capacityMissRate,
+                        conflictMissRate );
+        } else {
+            printf( "%d, %.4f, %.4f, %.2f, %.2f, %.2f\n", results[ i ].accesses, hitRate, missRate, compulsoryMissRate, capacityMissRate, conflictMissRate );
+        }
     }
 }
 

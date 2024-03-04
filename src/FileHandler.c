@@ -77,6 +77,11 @@ void handleBinaryFile( char * filePath, uint32_t ** addresses, size_t * size ) {
     
     *addresses = malloc( *size * sizeof( uint32_t ) );
 
+    if ( *addresses == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+
     // Copies all the addresses to the array correcting the endianess
     for ( size_t i = 0; i < *size; i++ ) {
         uint32_t value;

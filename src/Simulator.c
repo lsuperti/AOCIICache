@@ -135,35 +135,38 @@ typedef struct _cacheSet_t {
 } cacheSet_t;
 
 typedef struct _cache_t {   
-    // General parameters
-    uint32_t      nsets;
-    uint32_t      bsize;
-    uint32_t      assoc;
-    int           replacementPolicy;
+    // Cache configuration
+    cacheConfig_t     cacheConfig;
     
     // Runtime parameters
-    bool          cacheKnownFull;
+    bool               cacheKnownFull;
     
     // Replacement policy parameters
-    unsigned int  lruCounter;
-    unsigned int  fifoCounter;
+    unsigned int       lruCounter;
+    unsigned int       fifoCounter;
     
     // Statistics
-    result_t      result;
+    result_t           result;
 
     // Cache structure
-    cacheSet_t *  sets;
+    cacheSet_t *       sets;
+
+    // Next level cache
+    struct _cache_t *  nextLevel;
 } cache_t;
 
 /*
  * This function initializes a cache structure.
  */
-cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc, int replacementPolicy ) {
+cache_t * initializeCache( cacheConfigList_t * cacheConfigList ) {
     cache_t * cache = malloc( sizeof( cache_t ) );
-    cache->nsets = nsets;
-    cache->bsize = bsize;
-    cache->assoc = assoc;
-    cache->replacementPolicy = replacementPolicy;
+
+    if ( cache == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+    
+    cache->cacheConfig = cacheConfigList->cacheConfig;
     
     cache->cacheKnownFull = false;
 
@@ -172,15 +175,31 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc, int r
 
     cache->result = ( result_t ){ .hits = 0, .capacityMisses = 0, .conflictMisses = 0, .compulsoryMisses = 0, .accesses = 0 };
 
-    cache->sets = malloc( sizeof( cacheSet_t ) * nsets );
+    cache->sets = malloc( sizeof( cacheSet_t ) * cacheConfigList->cacheConfig.nsets );
 
-    for ( size_t i = 0; i < nsets; i++ ) {
-        cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * assoc );
+    if ( cache->sets == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+
+    for ( size_t i = 0; i < cacheConfigList->cacheConfig.nsets; i++ ) {
+        cache->sets[ i ].lines = malloc( sizeof( cacheLine_t ) * cacheConfigList->cacheConfig.assoc );
+
+        if ( cache->sets[ i ].lines == NULL ) {
+            fputs( "Sem memória.\n", stderr );
+            exit( EXIT_FAILURE );
+        }
         
-        for ( size_t j = 0; j < assoc; j++ ) {
+        for ( size_t j = 0; j < cacheConfigList->cacheConfig.assoc; j++ ) {
             cache->sets[ i ].lines[ j ].valid = false;
             cache->sets[ i ].lines[ j ].lastUsed = 0;
         }
+    }
+
+    if ( cacheConfigList->next != NULL ) {
+        cache->nextLevel = initializeCache( cacheConfigList->next );
+    } else {
+        cache->nextLevel = NULL;
     }
     
     return cache;
@@ -190,8 +209,8 @@ cache_t * initializeCache( uint32_t nsets, uint32_t bsize, uint32_t assoc, int r
  * Parse a cache address into its tag, set index, and block offset.
  */
 void parseAddress( cache_t * cache, uint32_t address, uint32_t * tag, uint32_t * setIndex, uint32_t * blockOffset ) {
-    uint32_t offsetBits = log2PowerOf2( cache->bsize );
-    uint32_t setBits = log2PowerOf2( cache->nsets );
+    uint32_t offsetBits = log2PowerOf2( cache->cacheConfig.bsize );
+    uint32_t setBits = log2PowerOf2( cache->cacheConfig.nsets );
 
     *blockOffset = address & ( ( 1 << offsetBits ) - 1 );
     *setIndex = ( address >> offsetBits ) & ( ( 1 << setBits ) - 1 );
@@ -199,15 +218,24 @@ void parseAddress( cache_t * cache, uint32_t address, uint32_t * tag, uint32_t *
 }
 
 /*
- * This function destroys the cache structure.
+ * This function destroys the cache structure, including lower level caches.
  */
 void destroyCache( cache_t * cache ) {
-    for ( size_t i = 0; i < cache->nsets; i++ ) {
-        free( cache->sets[ i ].lines );
+    cache_t *  current = cache;
+    cache_t *  previous;
+
+    while ( current != NULL ) {
+        for ( size_t i = 0; i < current->cacheConfig.nsets; i++ ) {
+            free( current->sets[ i ].lines );
+        }
+
+        free( current->sets );
+        
+        previous = current;
+        current = current->nextLevel;
+        
+        free( previous );
     }
-    
-    free( cache->sets );
-    free( cache );
 }
 
 /*
@@ -216,8 +244,8 @@ void destroyCache( cache_t * cache ) {
  * This function has a time complexity of O(n * m), where n is the number of sets and m is the associativity, so unecessary calls should be avoided.
  */
 bool cacheFull( cache_t * cache ) {
-    for ( uint32_t i = 0; i < cache->nsets; i++ ) {
-        for ( uint32_t j = 0; j < cache->assoc; j++ ) {
+    for ( uint32_t i = 0; i < cache->cacheConfig.nsets; i++ ) {
+        for ( uint32_t j = 0; j < cache->cacheConfig.assoc; j++ ) {
             if ( !cache->sets[ i ].lines[ j ].valid ) {
                 return false;
             }
@@ -245,10 +273,15 @@ void updateCapacityConflictMissStats( cache_t * cache ) {
     }
 }
 
+// Dispatcher must be forward declared for the recursion to work
+void accessCache_r( cache_t * cache, uint32_t address );
+
 /*
  * Simulate a cache access using the RANDOM replacement policy.
+ *
+ * This function is indirectly recursive, as it calls accessCache_r, which calls a cache access function.
  */
-void accessCacheRandom( cache_t * cache, uint32_t address ) {
+void accessCacheRandom_r( cache_t * cache, uint32_t address ) {
     uint32_t tag, setIndex, blockOffset;
     parseAddress(cache, address, &tag, &setIndex, &blockOffset);
 
@@ -258,7 +291,7 @@ void accessCacheRandom( cache_t * cache, uint32_t address ) {
     cache->result.accesses++; // Increment the number of accesses in all cases
 
     // Find a cache hit or an empty line
-    for ( uint32_t i = 0; i < cache->assoc; i++ ) {
+    for ( uint32_t i = 0; i < cache->cacheConfig.assoc; i++ ) {
         if ( set->lines[ i ].valid && set->lines[ i ].tag == tag ) {
             // Hit
             cache->result.hits++;
@@ -280,18 +313,25 @@ void accessCacheRandom( cache_t * cache, uint32_t address ) {
         cache->result.compulsoryMisses++;
     } else {
         // If no empty line, replace a random line
-        uint32_t replaceIndex = rand() % cache->assoc;
+        uint32_t replaceIndex = rand() % cache->cacheConfig.assoc;
         set->lines[ replaceIndex ].tag = tag;
         set->lines[ replaceIndex ].valid = true;
         
         updateCapacityConflictMissStats( cache );
     }
+
+    // Look for the address in the next level of the cache
+    if ( cache->nextLevel != NULL ) {
+        accessCache_r( cache->nextLevel, address );
+    }
 }
 
 /*
  * Simulate a cache access using the LRU replacement policy.
+ *
+ * This function is indirectly recursive, as it calls accessCache_r, which calls a cache access function.
  */
-void accessCacheLRU( cache_t * cache, uint32_t address ) {
+void accessCacheLRU_r( cache_t * cache, uint32_t address ) {
     uint32_t  tag;
     uint32_t  setIndex;
     uint32_t  blockOffset;
@@ -307,7 +347,7 @@ void accessCacheLRU( cache_t * cache, uint32_t address ) {
     cache->result.accesses++; // Increment the number of accesses in all cases
 
     // Update LRU counter and find a cache hit, an empty line, or the LRU line
-    for ( uint32_t i = 0; i < cache->assoc; i++ ) {
+    for ( uint32_t i = 0; i < cache->cacheConfig.assoc; i++ ) {
         if ( set->lines[i].valid ) {
             if ( set->lines[i].tag == tag ) {
                 // Hit
@@ -341,12 +381,19 @@ void accessCacheLRU( cache_t * cache, uint32_t address ) {
 
         updateCapacityConflictMissStats( cache );
     }
+
+    // Look for the address in the next level of the cache
+    if ( cache->nextLevel != NULL ) {
+        accessCache_r( cache->nextLevel, address );
+    }
 }
 
 /*
  * Simulate a cache access using the FIFO replacement policy.
+ *
+ * This function is indirectly recursive, as it calls accessCache_r, which calls a cache access function.
  */
-void accessCacheFIFO( cache_t * cache, unsigned address ) {
+void accessCacheFIFO_r( cache_t * cache, unsigned address ) {
     uint32_t  tag;
     uint32_t  setIndex;
     uint32_t  blockOffset;
@@ -361,7 +408,7 @@ void accessCacheFIFO( cache_t * cache, unsigned address ) {
     cache->result.accesses++; // Increment the number of accesses in all cases
 
     // Search for a cache hit, an empty line, or the oldest line for FIFO
-    for ( uint32_t i = 0; i < cache->assoc; i++ ) {
+    for ( uint32_t i = 0; i < cache->cacheConfig.assoc; i++ ) {
         if ( set->lines[ i ].valid ) {
             if ( set->lines[ i ].tag == tag ) {
                 // Hit
@@ -394,20 +441,27 @@ void accessCacheFIFO( cache_t * cache, unsigned address ) {
 
         updateCapacityConflictMissStats( cache );
     }
+
+    // Look for the address in the next level of the cache
+    if ( cache->nextLevel != NULL ) {
+        accessCache_r( cache->nextLevel, address );
+    }
 }
 
 /*
  * Simulate a cache access using the cache's replacement policy.
  *
  * This a dispatch function that calls the appropriate function for the cache's replacement policy.
+ * 
+ * This function causes a recursive behavior, as it calls a cache access function, which in turn calls this function again.
  */
-void accessCache( cache_t * cache, uint32_t address ) {
-    if ( cache->replacementPolicy == RANDOM ) {
-        accessCacheRandom( cache, address );
-    } else if ( cache->replacementPolicy == LRU ) {
-        accessCacheLRU( cache, address );
-    } else if ( cache->replacementPolicy == FIFO ) {
-        accessCacheFIFO( cache, address );
+void accessCache_r( cache_t * cache, uint32_t address ) {
+    if ( cache->cacheConfig.replacementPolicy == RANDOM ) {
+        accessCacheRandom_r( cache, address );
+    } else if ( cache->cacheConfig.replacementPolicy == LRU ) {
+        accessCacheLRU_r( cache, address );
+    } else if ( cache->cacheConfig.replacementPolicy == FIFO ) {
+        accessCacheFIFO_r( cache, address );
     } else {
         fputs( "Politica de substituição inválida.\n", stderr );
         exit( EXIT_FAILURE );
@@ -421,16 +475,44 @@ void accessCache( cache_t * cache, uint32_t address ) {
  * 
  * The supported replacement policies are RANDOM, LRU, and FIFO.
  */
-result_t simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList_t * cacheConfigList ) {
-    cache_t *  cache = initializeCache( cacheConfigList->cacheConfig.nsets, cacheConfigList->cacheConfig.bsize, cacheConfigList->cacheConfig.assoc, cacheConfigList->cacheConfig.replacementPolicy );
-    result_t   result;
+result_t * simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList_t * cacheConfigList ) {
+    cache_t *   cache = initializeCache( cacheConfigList );
+    result_t *  results;
+    size_t      cacheLevels = 0;
+    cache_t *   currentCache = cache;
 
     for ( size_t i = 0; i < addressesSize; i++ ) {
-        accessCache( cache, addresses[ i ] );
+        accessCache_r( cache, addresses[ i ] );
     }
 
-    result = cache->result;
+    // Find the number of cache levels
+    while ( currentCache != NULL ) {
+        cacheLevels++;
+        currentCache = currentCache->nextLevel;
+    }
+
+    results = malloc( sizeof( result_t ) * cacheLevels );
+
+    printf( "Cache levels: %zu\n", cacheLevels );
+
+    if ( results == NULL ) {
+        fputs( "Sem memória.\n", stderr );
+        exit( EXIT_FAILURE );
+    }
+
+    currentCache = cache;
+
+    size_t i = 0;
+
+    // Put the results from all cache levels in the results array
+    while ( currentCache != NULL ) {
+        results[ i ] = currentCache->result;
+        currentCache = currentCache->nextLevel;
+
+        i++;
+    }
+
     destroyCache( cache );
     
-    return result;
+    return results;
 }

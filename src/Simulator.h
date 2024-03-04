@@ -19,5 +19,5 @@ enum replacementPolicy_t {
 };
 
 result_t simulateDirectMapping( uint32_t * addresses, size_t addressesSize, uint32_t bsize, uint32_t nsets );
-result_t simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList_t * cacheConfigList );
+result_t * simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList_t * cacheConfigList );
 #endif

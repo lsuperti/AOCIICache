@@ -291,7 +291,7 @@
             "name": "Multi level test",
             "type": "cppdbg",
             "request": "launch",
-            "args": ["1", "4", "32", "R", "1", "tests/vortex.in.sem.persons.bin", "-l3", "4", "16", "128", "L", "-l2", "2", "8", "64", "F"],
+            "args": ["16", "2", "8", "R", "0", "tests/vortex.in.sem.persons.bin", "-l2", "256", "4", "1", "R", "-l3", "512", "8", "2", "R"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
