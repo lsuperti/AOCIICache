@@ -139,7 +139,7 @@ typedef struct _cache_t {
     cacheConfig_t     cacheConfig;
     
     // Runtime parameters
-    bool               cacheKnownFull;
+    uint32_t          validLines;
     
     // Replacement policy parameters
     unsigned int       lruCounter;
@@ -168,7 +168,7 @@ cache_t * initializeCache( cacheConfigList_t * cacheConfigList ) {
     
     cache->cacheConfig = cacheConfigList->cacheConfig;
     
-    cache->cacheKnownFull = false;
+    cache->validLines = 0;
 
     cache->lruCounter = 0;
     cache->fifoCounter = 0;
@@ -239,37 +239,13 @@ void destroyCache( cache_t * cache ) {
 }
 
 /*
- * Check if the cache is full by checking if all the lines are valid.
- *
- * This function has a time complexity of O(n * m), where n is the number of sets and m is the associativity, so unecessary calls should be avoided.
- */
-bool cacheFull( cache_t * cache ) {
-    for ( uint32_t i = 0; i < cache->cacheConfig.nsets; i++ ) {
-        for ( uint32_t j = 0; j < cache->cacheConfig.assoc; j++ ) {
-            if ( !cache->sets[ i ].lines[ j ].valid ) {
-                return false;
-            }
-        }
-    }
-    
-    return true;
-}
-
-/*
  * Determine if a cache miss is a capacity miss or a conflict miss and update the statistics accordingly.
- *
- * This function uses the slow cacheFull function, but it also keeps track of the known full status of the cache so it won't call it when the cache is already known to be full.
  */
 void updateCapacityConflictMissStats( cache_t * cache ) {
-    if ( cache->cacheKnownFull ) {
+    if (cache->validLines == cache->cacheConfig.nsets * cache->cacheConfig.assoc) {
         cache->result.capacityMisses++;
     } else {
-        if ( cacheFull( cache ) ) {
-            cache->cacheKnownFull = true;
-            cache->result.capacityMisses++;
-        } else {
-            cache->result.conflictMisses++;
-        }
+        cache->result.conflictMisses++;
     }
 }
 
@@ -310,6 +286,8 @@ void accessCacheRandom_r( cache_t * cache, uint32_t address ) {
         set->lines[ emptyLineIndex ].valid = true;
         set->lines[ emptyLineIndex ].tag = tag;
 
+        cache->validLines++;
+
         cache->result.compulsoryMisses++;
     } else {
         // If no empty line, replace a random line
@@ -338,11 +316,10 @@ void accessCacheLRU_r( cache_t * cache, uint32_t address ) {
     
     parseAddress( cache, address, &tag, &setIndex, &blockOffset );
 
-    cacheSet_t * set = &cache->sets[ setIndex ];
-    
-    int emptyLineIndex = -1;
-    unsigned int oldestTime = UINT_MAX;
-    int32_t lruIndex = -1;
+    cacheSet_t *   set = &cache->sets[ setIndex ];
+    int            emptyLineIndex = -1;
+    unsigned int  oldestTime = UINT_MAX;
+    int32_t       lruIndex = -1;
 
     cache->result.accesses++; // Increment the number of accesses in all cases
 
@@ -372,6 +349,8 @@ void accessCacheLRU_r( cache_t * cache, uint32_t address ) {
         set->lines[ emptyLineIndex ].valid = 1;
         set->lines[ emptyLineIndex ].tag = tag;
         set->lines[ emptyLineIndex ].lastUsed = ++cache->lruCounter; // Update usage time
+
+        cache->validLines++;
 
         cache->result.compulsoryMisses++;
     } else {
@@ -433,6 +412,8 @@ void accessCacheFIFO_r( cache_t * cache, unsigned address ) {
         set->lines[ emptyLineIndex ].tag = tag;
         set->lines[ emptyLineIndex ].inserted = ++cache->fifoCounter; // Set the insertion time
 
+        cache->validLines++;
+
         cache->result.compulsoryMisses++;
     } else {
         // If there isn't an empty line, replace the oldest line
@@ -492,8 +473,6 @@ result_t * simulate( uint32_t * addresses, size_t addressesSize, cacheConfigList
     }
 
     results = malloc( sizeof( result_t ) * cacheLevels );
-
-    printf( "Cache levels: %zu\n", cacheLevels );
 
     if ( results == NULL ) {
         fputs( "Sem memória.\n", stderr );
