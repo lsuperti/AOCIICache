@@ -148,34 +148,26 @@ void handleTextFile( char * filePath, uint32_t ** values, size_t * size ) {
 /*
  * Reads a binary or text file containing 32-bit addresses and stores them in an array.
  *
- * The file type is automatically detected based on the file extension, .bin for binary and .txt for text.
+ * The file type is automatically detected based on the file extension, .txt for text files and anything else or no extension for binary files.
  *
  * The array is dynamically allocated, caller is responsible for freeing it.
  * 
  * values is dereferenced with the newly allocated array and size is dereferenced with the number of elements in the array.
  */
 void handleFile( char * filePath, uint32_t ** values, size_t * size ) {
-    // Get the file extension and base name
-    char *  extension = strrchr( filePath, '.' );
-    char *  basename = getFileBasename( filePath );
+    // Get the file extension string
+    char * extension = strrchr( filePath, '.' );
     
     if ( extension != NULL ) {
-        // Handle binary files
-        if ( strcmp( extension, ".bin" ) == 0 ) {
-            handleBinaryFile( filePath, values, size );
-        }
         // Handle text files
-        else if ( strcmp( extension, ".txt" ) == 0 ) {
+        if ( strcmp( extension, ".txt" ) == 0 ) {
             handleTextFile( filePath, values, size );
-        }
-        // Unsupported file extension
-        else {
-            fprintf( stderr, "%s: a extensão \"%s\" não é suportada.\n", basename, extension );
-            exit( EXIT_FAILURE );
+        // Handle binary files if the extension is not .txt
+        } else {
+            handleBinaryFile( filePath, values, size );
         }
     // No file extension
     } else {
-        fprintf( stderr, "%s: nome de arquivo inválido.\n", basename );
-        exit( EXIT_FAILURE );
+        handleBinaryFile( filePath, values, size );
     }
 }

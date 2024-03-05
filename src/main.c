@@ -202,7 +202,7 @@ unsigned long parseCacheLevelSpecifier( char * input ) {
     number = strtoul( input + 2, &endptr, 10 );
     
     if ( *endptr != '\0' || endptr == input || errno == ERANGE ) {
-        fprintf( stderr, "Erro: especificador de nível de cache =\"%s\" é inválido.\n", input );
+        fprintf( stderr, "Erro: especificador de nível de cache \"%s\" é inválido.\n", input );
         exit( EXIT_FAILURE );
     }
     

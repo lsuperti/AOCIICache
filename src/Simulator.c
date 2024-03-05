@@ -123,38 +123,6 @@ result_t simulateDirectMapping( uint32_t * addresses, size_t addressesSize, uint
     return result;
 }
 
-typedef struct _cacheLine_t {
-    bool          valid;
-    uint32_t      tag;
-    unsigned int  lastUsed; // For LRU
-    unsigned int  inserted; // For FIFO
-} cacheLine_t;
-
-typedef struct _cacheSet_t {
-    cacheLine_t * lines;
-} cacheSet_t;
-
-typedef struct _cache_t {   
-    // Cache configuration
-    cacheConfig_t     cacheConfig;
-    
-    // Runtime parameters
-    uint32_t          validLines;
-    
-    // Replacement policy parameters
-    unsigned int       lruCounter;
-    unsigned int       fifoCounter;
-    
-    // Statistics
-    result_t           result;
-
-    // Cache structure
-    cacheSet_t *       sets;
-
-    // Next level cache
-    struct _cache_t *  nextLevel;
-} cache_t;
-
 /*
  * This function initializes a cache structure.
  */
@@ -209,8 +177,8 @@ cache_t * initializeCache( cacheConfigList_t * cacheConfigList ) {
  * Parse a cache address into its tag, set index, and block offset.
  */
 void parseAddress( cache_t * cache, uint32_t address, uint32_t * tag, uint32_t * setIndex, uint32_t * blockOffset ) {
-    uint32_t offsetBits = log2PowerOf2( cache->cacheConfig.bsize );
-    uint32_t setBits = log2PowerOf2( cache->cacheConfig.nsets );
+    const uint32_t  offsetBits = log2PowerOf2( cache->cacheConfig.bsize );
+    const uint32_t  setBits = log2PowerOf2( cache->cacheConfig.nsets );
 
     *blockOffset = address & ( ( 1 << offsetBits ) - 1 );
     *setIndex = ( address >> offsetBits ) & ( ( 1 << setBits ) - 1 );
@@ -242,7 +210,7 @@ void destroyCache( cache_t * cache ) {
  * Determine if a cache miss is a capacity miss or a conflict miss and update the statistics accordingly.
  */
 void updateCapacityConflictMissStats( cache_t * cache ) {
-    if (cache->validLines == cache->cacheConfig.nsets * cache->cacheConfig.assoc) {
+    if ( cache->validLines == cache->cacheConfig.nsets * cache->cacheConfig.assoc ) {
         cache->result.capacityMisses++;
     } else {
         cache->result.conflictMisses++;
@@ -275,8 +243,9 @@ void accessCacheRandom_r( cache_t * cache, uint32_t address ) {
             return;
         }
         
+        // Find the first empty line, if there is one
         if ( !set->lines[ i ].valid && emptyLineIndex == -1 ) {
-            emptyLineIndex = i; // Remember the first empty line
+            emptyLineIndex = i;
         }
     }
 
@@ -290,7 +259,7 @@ void accessCacheRandom_r( cache_t * cache, uint32_t address ) {
 
         cache->result.compulsoryMisses++;
     } else {
-        // If no empty line, replace a random line
+        // If no empty lines, replace a random line
         uint32_t replaceIndex = rand() % cache->cacheConfig.assoc;
         set->lines[ replaceIndex ].tag = tag;
         set->lines[ replaceIndex ].valid = true;
@@ -316,8 +285,8 @@ void accessCacheLRU_r( cache_t * cache, uint32_t address ) {
     
     parseAddress( cache, address, &tag, &setIndex, &blockOffset );
 
-    cacheSet_t *   set = &cache->sets[ setIndex ];
-    int            emptyLineIndex = -1;
+    cacheSet_t *  set = &cache->sets[ setIndex ];
+    int           emptyLineIndex = -1;
     unsigned int  oldestTime = UINT_MAX;
     int32_t       lruIndex = -1;
 
@@ -325,10 +294,10 @@ void accessCacheLRU_r( cache_t * cache, uint32_t address ) {
 
     // Update LRU counter and find a cache hit, an empty line, or the LRU line
     for ( uint32_t i = 0; i < cache->cacheConfig.assoc; i++ ) {
-        if ( set->lines[i].valid ) {
-            if ( set->lines[i].tag == tag ) {
+        if ( set->lines[ i ].valid ) {
+            if ( set->lines[ i ].tag == tag ) {
                 // Hit
-                set->lines[i].lastUsed = ++cache->lruCounter; // Update usage time
+                set->lines[ i ].lastUsed = ++cache->lruCounter; // Update usage time
                 cache->result.hits++;
                 
                 return;
@@ -452,7 +421,7 @@ void accessCache_r( cache_t * cache, uint32_t address ) {
 /*
  * Simulates the behaviour of a cache accessing an array of addresses.
  *
- * Accepts any valid number of sets, block size, and associativity for 32-bit cache.
+ * Accepts any valid number of sets, block size, and associativity for a 32-bit cache.
  * 
  * The supported replacement policies are RANDOM, LRU, and FIFO.
  */
