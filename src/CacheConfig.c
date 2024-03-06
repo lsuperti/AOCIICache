@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "CacheSimulator.h"
 #include "CacheConfig.h"
 
 void initializeCacheConfigList( cacheConfigList_t ** head, cacheConfig_t * cacheConfig ) {
@@ -77,7 +78,7 @@ void verifyCacheConfig( cacheConfigList_t * head ) {
 
     // The first cache level must be L1
     if ( head->cacheConfig.level != 1 ) {
-        fputs( "Cache L1 não foi configurada.\n", stderr );
+        fputs( "A cache L1 não foi configurada.\n", stderr );
         exit( EXIT_FAILURE );
     }
 
@@ -90,6 +91,7 @@ void verifyCacheConfig( cacheConfigList_t * head ) {
 
         size = current->cacheConfig.nsets * current->cacheConfig.bsize * current->cacheConfig.assoc;
 
+        // The size of the cache must not be zero
         if ( size == 0 ) {
             fprintf( stderr, "O tamanho da cache L%lu é zero.\n", current->cacheConfig.level );
             exit( EXIT_FAILURE );
@@ -97,13 +99,25 @@ void verifyCacheConfig( cacheConfigList_t * head ) {
 
         // The size of the cache must not be smaller than the previous level
         if ( size < previousSize ) {
-            fprintf( stderr, "O tamanho da cache L%lu é menor que o tamanho da cache L%lu.\n", current->cacheConfig.level, current->cacheConfig.level - 1 );
+            fprintf( stderr, "O tamanho da cache L%lu (%" PRIu32 ") é menor que o tamanho da cache L%lu (%" PRIu32 ").\n", current->cacheConfig.level, current->cacheConfig.level - 1 );
             exit( EXIT_FAILURE );
         }
 
-        // bsize, assoc, and nsets must be powers of 2
-        if ( !isPowerOfTwo( current->cacheConfig.bsize ) || !isPowerOfTwo( current->cacheConfig.assoc ) || !isPowerOfTwo( current->cacheConfig.nsets ) ) {
-            fprintf( stderr, "L%lu: os valores de bsize, assoc e nsets devem ser potências de 2.\n", current->cacheConfig.level );
+        // bsize must be a power of 2
+        if ( !isPowerOfTwo(current->cacheConfig.bsize ) ) {
+            fprintf( stderr, "O valor de <bsize> (%" PRIu32 ") da cache L%lu não é uma potência de 2.\n", current->cacheConfig.bsize, current->cacheConfig.level );
+            exit( EXIT_FAILURE );
+        }
+
+        // assoc must be a power of 2
+        if ( !isPowerOfTwo(current->cacheConfig.assoc ) ) {
+            fprintf( stderr, "O valor de <assoc> (%" PRIu32 ") da cache L%lu não é uma potência de 2.\n", current->cacheConfig.assoc, current->cacheConfig.level );
+            exit( EXIT_FAILURE );
+        }
+
+        // nsets must be a power of 2
+        if ( !isPowerOfTwo( current->cacheConfig.nsets ) ) {
+            fprintf( stderr, "O valor de <nsets> (%" PRIu32 ") da cache L%lu não é uma potência de 2.\n", current->cacheConfig.nsets, current->cacheConfig.level );
             exit( EXIT_FAILURE );
         }
 

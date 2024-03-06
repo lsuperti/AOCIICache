@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <limits.h>
 
+#include "CacheSimulator.h"
 #include "Simulator.h"
 #include "CacheConfig.h"
 

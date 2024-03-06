@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "CacheSimulator.h"
+
 /*
  * Gets the size of a file.
 */
@@ -148,13 +150,15 @@ void handleTextFile( char * filePath, uint32_t ** values, size_t * size ) {
 /*
  * Reads a binary or text file containing 32-bit addresses and stores them in an array.
  *
- * The file type is automatically detected based on the file extension, .txt for text files and anything else or no extension for binary files.
+ * The file type is automatically detected based on the file extension, .txt for text files and anything else or no
+ * extension for binary files.
  *
  * The array is dynamically allocated, caller is responsible for freeing it.
  * 
  * values is dereferenced with the newly allocated array and size is dereferenced with the number of elements in the array.
  */
 void handleFile( char * filePath, uint32_t ** values, size_t * size ) {
+    #if COMPLIANCE_LEVEL < 1
     // Get the file extension string
     char * extension = strrchr( filePath, '.' );
     
@@ -170,4 +174,10 @@ void handleFile( char * filePath, uint32_t ** values, size_t * size ) {
     } else {
         handleBinaryFile( filePath, values, size );
     }
+    #else
+    /* If the compliance level is strict, only handle binary files, since text files are not supported, all files are
+     * treated as binary, even if they have a .txt extension.
+     */
+    handleBinaryFile( filePath, values, size );
+    #endif
 }

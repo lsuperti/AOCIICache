@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <time.h>
 
+#include "CacheSimulator.h"
 #include "FileHandler.h"
 #include "Simulator.h"
 #include "CacheConfig.h"
@@ -18,7 +19,7 @@ enum outFlag_t {
 };
 
 void           printOutput( result_t * results, unsigned long cacheLevels, int flagOut );
-unsigned long  parseNumberInput( char * input, int index );
+unsigned long  parseNumberInput( char * input, int index, int level );
 int            parseReplacementPolicy( char * subst );
 unsigned long  parseCacheLevelSpecifier( char * input );
 
@@ -29,18 +30,26 @@ int main( int argc, char *argv[] ) {
     // Quote the executable path if it has spaces
     char * quote = strchr( argv[ 0 ], ' ' ) == NULL ? "" : "\"";
     
+    #if COMPLIANCE_LEVEL < 2
     if ( argc < 7 ) {
         fprintf( stderr, "Número de argumentos incorreto. Utilize:\n"
                          "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada> [-l<level> <nsets> <bsize> <assoc> <substituição>]*\n", quote, argv[ 0 ], quote );
         exit( EXIT_FAILURE );
     }
+    #else
+    if ( argc != 7 ) {
+        fprintf( stderr, "Número de argumentos incorreto. Utilize:\n"
+                         "%s%s%s <nsets> <bsize> <assoc> <substituição> <flag_saída> <arquivo_de_entrada>\n", quote, argv[ 0 ], quote );
+        exit( EXIT_FAILURE );
+    }
+    #endif
 
     // Get the parameters and first cache level configuration
-    uint32_t             nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1 );
-    uint32_t             bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2 );
-    uint32_t             assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3 );
+    uint32_t             nsets = ( uint32_t )parseNumberInput( argv[ 1 ], 1, 1 );
+    uint32_t             bsize = ( uint32_t )parseNumberInput( argv[ 2 ], 2, 1 );
+    uint32_t             assoc = ( uint32_t )parseNumberInput( argv[ 3 ], 3, 1 );
     char *               substString = argv[ 4 ];
-    int                  flagOut = ( int )parseNumberInput( argv[ 5 ], 5 );
+    int                  flagOut = ( int )parseNumberInput( argv[ 5 ], 5, 0 );
     char *               arquivoEntrada = argv[ 6 ];
     uint32_t *           addresses;
     size_t               size;
@@ -52,6 +61,7 @@ int main( int argc, char *argv[] ) {
     
     initializeCacheConfigList( &cacheConfigList, &cacheConfig );
 
+    #if COMPLIANCE_LEVEL < 2
     // Get lower cache levels
     for ( int i = 7; i < argc; i += 5 ) {
         if ( argv[ i ][ 0 ] == '-' && argv[ i ][ 1 ] == 'l' ) {
@@ -64,9 +74,9 @@ int main( int argc, char *argv[] ) {
                 exit( EXIT_FAILURE );
             }
 
-            nsets = ( uint32_t )parseNumberInput( argv[ i + 1 ], 1 );
-            bsize = ( uint32_t )parseNumberInput( argv[ i + 2 ], 2 );
-            assoc = ( uint32_t )parseNumberInput( argv[ i + 3 ], 3 );
+            nsets = ( uint32_t )parseNumberInput( argv[ i + 1 ], 1, cacheLevel );
+            bsize = ( uint32_t )parseNumberInput( argv[ i + 2 ], 2, cacheLevel );
+            assoc = ( uint32_t )parseNumberInput( argv[ i + 3 ], 3, cacheLevel );
             substString = argv[ i + 4 ];
 
             cacheConfig = ( cacheConfig_t ){ .nsets = nsets, .bsize = bsize, .assoc = assoc, .replacementPolicy = parseReplacementPolicy( substString ), .level = cacheLevel };
@@ -76,6 +86,10 @@ int main( int argc, char *argv[] ) {
             numberOfCacheLevels++;
         }
     }
+    #else
+    // Avoid unused variable warnings on very strict compliance level, where cache levels are not supported
+    ( void )cacheLevel;
+    #endif
 
     verifyCacheConfig( cacheConfigList );
     
@@ -165,9 +179,10 @@ void printOutput( result_t * results, unsigned long cacheLevels, int flagOut ) {
  * 
  * The strtoul function is considered safe to parse user-provided strings, as it will do error and security checks.
  * 
- * The strtoul function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or "0" respectively (and binary ("0b") if the program is compiled with C2x).
+ * The strtoul function will automatically handle hexadecimal and octal numbers if the input string starts with "0x" or
+ * "0" respectively (and binary ("0b") if the program is compiled with C2x).
  */
-unsigned long parseNumberInput( char * input, int index ) {
+unsigned long parseNumberInput( char * input, int index, int level ) {
     unsigned long  number;
     char *         endptr;
     const char *   args[] = { NULL, "<nsets>", "<bsize>", "<assoc>", "<substituição>", "<flag_saída>", "<arquivo_de_entrada>" };
@@ -177,12 +192,48 @@ unsigned long parseNumberInput( char * input, int index ) {
 
     errno = 0;
 
-    // Use base 0 to automatically allow hexadecimal and octal numbers (and binary if compiling with C2x).
-    number = strtoul( input, &endptr, 0 );
+    #if COMPLIANCE_LEVEL < 2
+    if ( strlen( input ) >= 2 ) {
+        // Binary
+        if ( input[ 0 ] == '0' && ( input[ 1 ] == 'b' || input[ 1 ] == 'B' ) ) {
+            number = strtoul( input + 2, &endptr, 2 );
+        // Octal with prefix "0o"
+        } else if ( input[ 0 ] == '0' && ( input[ 1 ] == 'o' || input[ 1 ] == 'O' ) ) {
+            number = strtoul( input + 2, &endptr, 8 );
+        // Hexadecimal
+        } else if ( input[ 0 ] == '0' && ( input[ 1 ] == 'x' || input[ 1 ] == 'X' ) ) {
+            number = strtoul( input + 2, &endptr, 16 );
+        } else {
+            #if COMPLIANCE_LEVEL < 1
+            // Accept 0 as octal prefix
+            number = strtoul( input, &endptr, 0 );
+            #else
+            // Accept only decimals if a prefix is not present
+            number = strtoul( input, &endptr, 10 );
+            #endif
+        }
+    } else {
+        #if COMPLIANCE_LEVEL < 1
+        // Accept 0 as octal prefix
+        number = strtoul( input, &endptr, 0 );
+        #else
+        // Do not accept a single 0 as an octal prefix
+        number = strtoul( input, &endptr, 10 );
+        #endif
+    }
+    #else
+    // Only decimals allowed in very strict compliance level
+    number = strtoul( input, &endptr, 10 );
+    #endif
     
     if ( *endptr != '\0' || endptr == input || errno == ERANGE ) {
-        fprintf( stderr, "Erro: argumento \"%s\" no parâmetro %s não é um número válido ou aceitável.\n", input, args[ index ] );
-        exit( EXIT_FAILURE );
+        if ( level != 0 ) {
+            fprintf( stderr, "Erro: argumento \"%s\" no parâmetro %s da cache L%d não é um número válido ou aceitável.\n", input, args[ index ], level );
+            exit( EXIT_FAILURE );
+        } else {
+            fprintf( stderr, "Erro: argumento \"%s\" no parâmetro %s não é um número válido ou aceitável.\n", input, args[ index ] );
+            exit( EXIT_FAILURE );
+        }
     }
     
     return number;
@@ -212,12 +263,17 @@ unsigned long parseCacheLevelSpecifier( char * input ) {
 /*
  * This function parses the replacement policy string and returns the corresponding enum value.
  * 
- * It accepts either uppercase or lowercase letters as it seems the specification requires that.
+ * Accepts lowercase letters in addition to uppercase letters as an additional feature if the compliance level is not
+ * very strict.
  * 
  * The accepted letters are: 'R' for RANDOM, 'L' for LRU, and 'F' for FIFO.
  */
 int parseReplacementPolicy( char * subst ) {
+    #if COMPLIANCE_LEVEL < 2
     #define ASCII_CHAR_TO_UPPER( c ) ( ( c ) & 0xDF )
+    #else
+    #define ASCII_CHAR_TO_UPPER( c ) ( c )
+    #endif
     
     if ( ASCII_CHAR_TO_UPPER( subst[ 0 ] ) == 'R' && subst[ 1 ] == '\0' ) {
         return RANDOM;
