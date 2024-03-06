@@ -99,7 +99,7 @@ void verifyCacheConfig( cacheConfigList_t * head ) {
 
         // The size of the cache must not be smaller than the previous level
         if ( size < previousSize ) {
-            fprintf( stderr, "O tamanho da cache L%lu (%" PRIu32 ") é menor que o tamanho da cache L%lu (%" PRIu32 ").\n", current->cacheConfig.level, current->cacheConfig.level - 1 );
+            fprintf( stderr, "O tamanho da cache L%lu (%" PRIu32 ") é menor que o tamanho da cache L%lu (%" PRIu32 ").\n", current->cacheConfig.level, size, current->cacheConfig.level - 1, previousSize );
             exit( EXIT_FAILURE );
         }
 
